@@ -1,0 +1,108 @@
+<html>
+
+<head>
+<title>The table</title>
+</head>
+
+<body>
+<table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:left;">
+</th>
+<th style="text-align:left;">
+Actually Positive
+</th>
+<th style="text-align:left;">
+Actually Negative
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+Predicted positive
+</td>
+<td style="text-align:left;">
+True positives (TP)
+</td>
+<td style="text-align:left;">
+False positives (FP)
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Predicted negative
+</td>
+<td style="text-align:left;">
+False negatives (FN)
+</td>
+<td style="text-align:left;">
+True negatives (TN)
+</td>
+</tr>
+</tbody>
+</table>
+
+
+
+<table>
+<colgroup>
+<col width="18%" />
+<col width="10%" />
+<col width="20%" />
+<col width="16%" />
+<col width="36%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Measure of</th>
+<th>Name 1</th>
+<th>Name 2</th>
+<th>Definition</th>
+<th>Probability representation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>sensitivity</td>
+<td>TPR</td>
+<td>Recall</td>
+<td><span class="math inline">\(\frac{\mbox{TP}}{\mbox{TP} + \mbox{FN}}\)</span></td>
+<td><span class="math inline">\(\mbox{Pr}(\hat{Y}=1 \mid Y=1)\)</span></td>
+</tr>
+<tr class="even">
+<td>specificity</td>
+<td>TNR</td>
+<td>1-FPR</td>
+<td><span class="math inline">\(\frac{\mbox{TN}}{\mbox{TN}+\mbox{FP}}\)</span></td>
+<td><span class="math inline">\(\mbox{Pr}(\hat{Y}=0 \mid Y=0)\)</span></td>
+</tr>
+<tr class="odd">
+<td>specificity</td>
+<td>PPV</td>
+<td>Precision</td>
+<td><span class="math inline">\(\frac{\mbox{TP}}{\mbox{TP}+\mbox{FP}}\)</span></td>
+<td><span class="math inline">\(\mbox{Pr}(Y=1 \mid \hat{Y}=1)\)</span></td>
+</tr>
+</tbody>
+</table>
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    var src = "true";
+    if (src === "" || src === "true") src = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML";
+    if (location.protocol !== "file:")
+      if (/^https?:/.test(src))
+        src = src.replace(/^https?:/, '');
+    script.src = src;
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+</body>
+</html>
