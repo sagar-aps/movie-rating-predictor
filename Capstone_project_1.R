@@ -12,6 +12,9 @@ if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
 
+
+
+
 library(tidyverse)
 library(caret)
 library(data.table)
@@ -35,9 +38,9 @@ movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))
                                            title = as.character(title),
                                            genres = as.character(genres))
 # if using R 4.0 or later:
-#movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
-#                                           title = as.character(title),
-#                                           genres = as.character(genres))
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                          title = as.character(title),
+                                          genres = as.character(genres))
 
 
 movielens <- left_join(ratings, movies, by = "movieId")
@@ -59,7 +62,7 @@ edx <- rbind(edx, removed)
 
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
-
+library(dplyr)
 nrow(edx)
 ncol(edx)
 
@@ -105,7 +108,7 @@ edx %>%
 
 library(tidyr)
 
-separate_rows()
+#separate_rows()
 
 df <- tibble(
   x = 1:3,
@@ -119,7 +122,7 @@ rm(df)
 
 genre_list <- unique(unlist(strsplit(edx$genres,"|", fixed=TRUE)))
 
-genre_list <- genre_list[1:19]
+#genre_list <- genre_list[1:19]
 
 edx[1:10] %>% mutate(Comedy = ifelse(str_detect(genres,"Comedy"),TRUE,FALSE),
                      Romance = ifelse(str_detect(genres,"Romance"),TRUE,FALSE))
@@ -187,7 +190,7 @@ mu_hat
 naive_rmse <- RMSE(test_set$rating,mu_hat)
 
 rmse_results <- tibble(method = "Just the average", RMSE = naive_rmse)
-
+rmse_results
 mu <- mu_hat
 
 #Y_{u,i} = \mu + b_i + \varepsilon_{u,i}
@@ -212,20 +215,29 @@ predicted_ratings <- test_set %>%
   pull(pred)
 
 
-RMSE(predicted_ratings , test_set$rating)
+User_And_Movie_effect <- RMSE(predicted_ratings , test_set$rating)
+
+rmse_results <- add_row(rmse_results,method = "Movie Average and User Average", RMSE = User_And_Movie_effect)
+rmse_results
+
+nmbr_ratings <- data %>% group_by(movieId) %>% summarise(n=n()) 
+
 
 #Checking errors to see which are the one we got wrong
 
 test_set %>% 
   left_join(movie_avgs, by='movieId') %>%
   left_join(user_avgs, by="userId") %>%
+  left_join(nmbr_ratings, by = "movieId") %>%
   mutate(residual = rating - (mu + b_i + b_u)) %>%
   arrange(desc(abs(residual))) %>%  
   slice(1:10) %>% 
-  pull(title)
+  select(title, residual, n) %>%
+  knitr::kable()
 
 
 #Mostly obscure. Need to penalize movies with few ratings
+#Movies with few ratings but very good ratings, (1 good rating)
 
 #Enter lambdas
 
@@ -262,11 +274,15 @@ qplot(lambdas,rmses)
 
 lambda <- lambdas[which.min(rmses)]
 
+lambda
 min(rmses)
 
 
-rmse_results <- rmse_results %>% add_row(method ="Unregularized user & Movie effects", RMSE =rmses[1])
+
 rmse_results <- rmse_results %>% add_row(method ="Regularized user & Movie effects", RMSE =min(rmses))
+rmse_results
+
+
 
 library(tidyr)
 library(ggplot2)
@@ -275,13 +291,36 @@ install.packages("recommenderlab")
 library(dplyr)
 library(recommenderlab)
 
-train_set %>% 
+sparse_m <- train_set %>% 
   select(userId,movieId,rating)%>%
   spread(movieId,rating)%>%
   as.matrix()%>%
   as("realRatingMatrix")
   
 view(head(data))
+
+
+#confirming behavior of spread. acast could also have ben used
+train_set[1:50] %>% 
+  select(userId,movieId,rating)%>%
+  spread(movieId,rating)
+
+head(sparse_m)
+view(train_set[1:50] )
+
+
+as(sparse_m, "matrix") [,1:10]
+
+
+UBCF_model <- Recommender(sparse_m,method="UBCF",param=list(normalize = "center"))
+
+data("MovieLense")
+
+MovieLense[101:102]
+
+
+
+predict(UBCF_model,,n=10)
 
 
 #Getting Time since first rating
@@ -294,6 +333,7 @@ library(lubridate)
 top_users <- data %>% 
   group_by(userId)%>%
   summarise(n=n(), first_rating= min(timestamp))
+
 #%>%
  # top_n(10)
 
