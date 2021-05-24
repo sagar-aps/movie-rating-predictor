@@ -12,13 +12,20 @@ if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
 
+install.packages("kableExtra", dependencies = T)
+install.packages("recosystem", dependencies = T)
 
-
-
+library(dplyr)
 library(tidyverse)
 library(caret)
 library(data.table)
 library(ggplot2)
+library(stringr)
+library(tidyr)
+library(kableExtra)
+library(caret)
+library(dplyr)
+library(recosystem)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -34,9 +41,9 @@ movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::",
 colnames(movies) <- c("movieId", "title", "genres")
 
 # if using R 3.6 or earlier:
-movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))[movieId],
-                                           title = as.character(title),
-                                           genres = as.character(genres))
+#movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))[movieId],
+#                                           title = as.character(title),
+#                                           genres = as.character(genres))
 # if using R 4.0 or later:
 movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
                                           title = as.character(title),
@@ -47,7 +54,7 @@ movielens <- left_join(ratings, movies, by = "movieId")
 
 # Validation set will be 10% of MovieLens data
 set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
-test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = 0)
 edx <- movielens[-test_index,]
 temp <- movielens[test_index,]
 
@@ -62,28 +69,22 @@ edx <- rbind(edx, removed)
 
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
-library(dplyr)
-nrow(edx)
-ncol(edx)
+#Data exploration
+
 
 
 head(edx)
 
 sum(edx$rating==3)
 
-
+nrow(edx)
+ncol(edx)
 edx %>% filter(rating==0) %>% head()
-
-
+edx %>% filter(rating>5) %>% head()
 edx %>% distinct(movieId) %>% count()
-
-
 edx %>% distinct(userId) %>% count()
 
-library(stringr)
-
 str_detect(edx$genres[1],"Comedy")
-
 
 sum(str_detect(edx$genres,"Drama"))
 
@@ -105,57 +106,61 @@ edx %>%
   ggplot(aes(x = rating, y = count)) +
   geom_line()
 
+library(ggplot2)
 
-library(tidyr)
+install.packages("ggthemes")
+library(ggthemes)
+edx %>%
+  group_by(userId)%>%
+  summarise(n=n())%>%
+  arrange(desc(n))%>%
+  ggplot(aes(n))+
+  geom_histogram(bins=200)+
+  scale_x_continuous(limits = c(0,750))+
+  theme_economist()
+  
 
-#separate_rows()
 
-df <- tibble(
-  x = 1:3,
-  y = c("a", "d,e,f", "g,h"),
-  z = c("1", "2,3,4", "5,6")
-)
 
-separate_rows(df, y, z, convert = TRUE)
-
-rm(df)
 
 genre_list <- unique(unlist(strsplit(edx$genres,"|", fixed=TRUE)))
 
 #genre_list <- genre_list[1:19]
 
-edx[1:10] %>% mutate(Comedy = ifelse(str_detect(genres,"Comedy"),TRUE,FALSE),
-                     Romance = ifelse(str_detect(genres,"Romance"),TRUE,FALSE))
+edx[1:10] %>% mutate(Comedy = ifelse(str_detect(genres,"Comedy"),TRUE,0),
+                     Romance = ifelse(str_detect(genres,"Romance"),TRUE,0))
 
-#edx[1:10] %>% mutate(genre_list[1] := ifelse(str_detect(genres,"Comedy"),TRUE,FALSE))
+#edx[1:10] %>% mutate(genre_list[1] := ifelse(str_detect(genres,"Comedy"),TRUE,0))
 #for (g in genre_list){
-#edx[1:10] %>% mutate_( g := ifelse(str_detect('genres',g),TRUE,FALSE))
+#edx[1:10] %>% mutate_( g := ifelse(str_detect('genres',g),TRUE,0))
 #}
+
+
 #for (g in genre_list){
 #  print(g)
 #}
 #class(genre_list[1])
 #library(rlang)
 
-data <- edx %>% mutate(Romance = ifelse(str_detect(genres,"Romance"),TRUE,FALSE),
-  Comedy = ifelse(str_detect(genres,"Comedy"),TRUE,FALSE),
-  Action = ifelse(str_detect(genres,"Action"),TRUE,FALSE),
-  Crime = ifelse(str_detect(genres,"Crime"),TRUE,FALSE),
-  Thriller = ifelse(str_detect(genres,"Thriller"),TRUE,FALSE),
-  Drama = ifelse(str_detect(genres,"Drama"),TRUE,FALSE),
-  Sci_Fi = ifelse(str_detect(genres,"Sci-Fi"),TRUE,FALSE),
-  Adventure = ifelse(str_detect(genres,"Adventure"),TRUE,FALSE),
-  Children = ifelse(str_detect(genres,"Children"),TRUE,FALSE),
-  Fantasy = ifelse(str_detect(genres,"Fantasy"),TRUE,FALSE),
-  War = ifelse(str_detect(genres,"War"),TRUE,FALSE),
-  Animation = ifelse(str_detect(genres,"Animation"),TRUE,FALSE),
-  Musical = ifelse(str_detect(genres,"Musical"),TRUE,FALSE),
-  Western = ifelse(str_detect(genres,"Western"),TRUE,FALSE),
-  Mystery = ifelse(str_detect(genres,"Mystery"),TRUE,FALSE),
-  Film_Noir = ifelse(str_detect(genres,"Film-Noir"),TRUE,FALSE),
-  Horror = ifelse(str_detect(genres,"Horror"),TRUE,FALSE),
-  Documentary = ifelse(str_detect(genres,"Documentary"),TRUE,FALSE),
-  IMAX = ifelse(str_detect(genres,"IMAX"),TRUE,FALSE)
+data <- edx %>% mutate(Romance = ifelse(str_detect(genres,"Romance"),1,0),
+  Comedy = ifelse(str_detect(genres,"Comedy"),1,0),
+  Action = ifelse(str_detect(genres,"Action"),1,0),
+  Crime = ifelse(str_detect(genres,"Crime"),1,0),
+  Thriller = ifelse(str_detect(genres,"Thriller"),1,0),
+  Drama = ifelse(str_detect(genres,"Drama"),1,0),
+  Sci_Fi = ifelse(str_detect(genres,"Sci-Fi"),1,0),
+  Adventure = ifelse(str_detect(genres,"Adventure"),1,0),
+  Children = ifelse(str_detect(genres,"Children"),1,0),
+  Fantasy = ifelse(str_detect(genres,"Fantasy"),1,0),
+  War = ifelse(str_detect(genres,"War"),1,0),
+  Animation = ifelse(str_detect(genres,"Animation"),1,0),
+  Musical = ifelse(str_detect(genres,"Musical"),1,0),
+  Western = ifelse(str_detect(genres,"Western"),1,0),
+  Mystery = ifelse(str_detect(genres,"Mystery"),1,0),
+  Film_Noir = ifelse(str_detect(genres,"Film-Noir"),1,0),
+  Horror = ifelse(str_detect(genres,"Horror"),1,0),
+  Documentary = ifelse(str_detect(genres,"Documentary"),1,0),
+  IMAX = ifelse(str_detect(genres,"IMAX"),1,0)
 )
 
 RMSE <- function(true_ratings, predicted_ratings){
@@ -164,11 +169,8 @@ RMSE <- function(true_ratings, predicted_ratings){
 
 #We divide the data into training and test sets
 
-library(caret)
-library(dplyr)
-
 test_index <- createDataPartition(y = data$rating, times = 1, p = 0.2, 
-                                  list = FALSE)
+                                  list = 0)
 
 train_set <- data[-test_index,]
 test_set <- data[test_index,]
@@ -199,6 +201,13 @@ movie_avgs <- train_set %>%
   group_by(movieId) %>% 
   summarize(b_i = mean(rating - mu))
 
+any(is.na(movie_avgs[,2]))
+
+
+movie_avgs[1:10,]
+
+
+
 qplot(movie_avgs$b_i,bins=10,color=I("black"))
 
 
@@ -206,6 +215,9 @@ user_avgs <- train_set %>%
   left_join(movie_avgs, by="movieId") %>%
   group_by(userId) %>%
   summarise(b_u= mean(rating-b_i-mu))
+
+any(is.na(user_avgs))
+
 
 
 predicted_ratings <- test_set %>%
@@ -215,7 +227,15 @@ predicted_ratings <- test_set %>%
   pull(pred)
 
 
-User_And_Movie_effect <- RMSE(predicted_ratings , test_set$rating)
+
+glimpse(predicted_ratings)
+glimpse(test_set$rating)
+
+
+User_And_Movie_effect <- RMSE( test_set$rating,predicted_ratings )
+
+
+
 
 rmse_results <- add_row(rmse_results,method = "Movie Average and User Average", RMSE = User_And_Movie_effect)
 rmse_results
@@ -267,9 +287,6 @@ rmses <- sapply(lambdas, function(l){
 })
 
 
-rmses
-
-
 qplot(lambdas,rmses)
 
 lambda <- lambdas[which.min(rmses)]
@@ -277,10 +294,91 @@ lambda <- lambdas[which.min(rmses)]
 lambda
 min(rmses)
 
-
+rmse_results$RMSE[2]
 
 rmse_results <- rmse_results %>% add_row(method ="Regularized user & Movie effects", RMSE =min(rmses))
 rmse_results
+
+
+head(data)
+
+#Let us take the residuals after applying regularization and apply a linear model to predict the residuals from the genre effect
+
+l<-lambda
+
+b_i <- train_set %>% 
+  group_by(movieId) %>%
+  summarize(b_i = sum(rating - mu)/(n()+l))
+
+b_u <- train_set %>% 
+  left_join(b_i, by="movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+
+genre_test <- train_set %>% 
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  mutate(residual = rating - mu- b_i-b_u) 
+
+genre_test %>% glimpse()
+
+genre_test %>% select(-c(rating:genres))
+
+
+#lm_fit  <- genre_test %>% lm(residual ~  c(Romance:IMAX))
+
+#lm_fit  <-  lm(residual ~ . , data = c(Romance:IMAX))
+{
+lm_fit <- lm(genre_test$residual ~ genre_test$Romance + genre_test$Comedy + genre_test$Action + genre_test$Crime + genre_test$Thriller + genre_test$Drama + genre_test$Sci_Fi + genre_test$Adventure + genre_test$Children + genre_test$Fantasy + genre_test$War + genre_test$Animation + genre_test$Musical + genre_test$Western + genre_test$Mystery+ genre_test$Film_Noir + genre_test$Horror + genre_test$Documentary+ genre_test$IMAX)
+genre_effect <- predict.lm(lm_fit,test_set )
+length(genre_effect)
+length(test_set$movieId)
+#PROBLEM
+}
+
+
+genre_test %>% glimpse()
+
+temp <- genre_test %>% select(c(Romance:IMAX,residual)) 
+lm_fit <-   lm(residual ~ ., data=temp)
+
+temp2 <- test_set %>% select(c(Romance:IMAX))  
+
+pred <- predict.lm(lm_fit, newdata = temp2)
+
+length(residual_temp)
+length(test_set$rating)
+length(genre_effect)
+
+predicted_ratings <- 
+  test_set %>% 
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  mutate(pred = mu + b_i + b_u + pred) %>%
+  pull(pred)
+
+
+rmse_genre_effect <- RMSE(predicted_ratings, test_set$rating)
+
+#.86538 , which is less than 0.8655425
+
+
+0.8655425-0.86538 
+
+
+mu_rep<-do.call("rbind", replicate(length(test_set), mu, simplify = FALSE))
+
+rmse_results <- rmse_results %>% add_row(method ="Regularized user & Movie effects and Genre effect", RMSE =rmse_genre_effect)
+
+kable(rmse_results) %>%
+  kable_styling(bootstrap_options = "striped" , full_width = F , position = "center") %>%
+  kable_styling(bootstrap_options = "bordered", full_width = F , position ="center") %>%
+  column_spec(1,bold = T ) %>%
+  column_spec(2,bold =T ,color = "white" , background ="#D7261E")
+
+
+
+
 
 #---------------------------------------------------Reccomender Lab Models -----------------------------------------------------------------------
 
@@ -297,325 +395,166 @@ library(Matrix)
 
 #For using recommenderlab, we need to make a sparse matrix and partition it using the inbuilt partition functions
 
-#Edx dataset transformation:usersId and movieId should be treat as factors for some analysis purposes.
-edx.copy <- edx
-edx.copy$userId <- as.factor(edx.copy$userId)
-edx.copy$movieId <- as.factor(edx.copy$movieId)
-#SparseMatrix function is used in order to get an output 0f sparse matrix of class dgcMatrix.
-# To use this function, the userId & movieId are converted to numeric vectors.
-edx.copy$userId <- as.numeric(edx.copy$userId)
-edx.copy$movieId <- as.numeric(edx.copy$movieId)
 
-sparse_m <- sparseMatrix(i = edx.copy$userId,
-                         j = edx.copy$movieId ,
-                         x = edx.copy$rating,
-                         dims = c(length(unique(edx.copy$userId)),
-                                  length(unique(edx.copy$movieId))),
-                         dimnames = list(paste("u", 1:length(unique(edx.copy$userId)), sep = ""),
-                                         paste("m", 1:length(unique(edx.copy$movieId)), sep = "")))
+create_sparse_m <- function(){
+  
+  sparse_m <- sparseMatrix(
+    i = as.numeric(as.factor(edx$userId)),
+    j = as.numeric(as.factor(edx$movieId)), 
+    x = edx$rating,
+    dims = c(length(unique(edx$userId)),
+             length(unique(edx$movieId))),
+    dimnames = list(paste("u", 1:length(unique(edx$userId)), sep = ""),
+                    paste("m", 1:length(unique(edx$movieId)), sep = "")))
+  
+  sparse_m <- new("realRatingMatrix", data = sparse_m)
+  return (sparse_m)
+  
+}
+
+as(sparse_m[1:10,1:10],"matrix")
+
+#UBCF takes hours to train so we need to reduce the data. we do this with the quantile function
+#UBCF has 2 parameters: given and nn 
+#Testing with different quantities of data from 0.9 - 0.5 and for given from 8-4 , nn from 15 to 55
+
+test_perc_given_nn <- expand.grid(perc=seq(0.9,0.5,-0.1),given=seq(8,4,-1),nn=seq(15,55,10))
+#min(rowCounts(sparse_m))
+tic.clearlog()
+#toString(test_perc_given_nn[1,],)
+#test_perc_given_nn[1,1]
+full_test_UBCF <- apply(test_perc_given_nn,1, function(t){
+  
+  print( paste("Now running model :", t[1], " is perc  ", t[2]," is given. ",  t[3]," is nn. "))
+  tic(toString(t))
+  y=t[1]
+  sparse_m <- create_sparse_m()
+  nn=t[3]
+  print(identical(sparse_m,sparse_m2))
+  set.seed(1991)
+  min_movies_by_user <- quantile(rowCounts(sparse_m),y)
+  min_ratings_per_movie<- quantile(rowCounts(sparse_m),y)
+  sparse_m_limited <- sparse_m[rowCounts(sparse_m)>=min_movies_by_user, colCounts(sparse_m)>=min_ratings_per_movie]
+  e4 <- evaluationScheme(sparse_m_limited , method="split", train=0.9,
+                         k=1, given=t[2])
+  r_UBCF <- Recommender(getData(e4, "train"), "UBCF",parameter=c(nn=nn))
+  p_UBCF <- predict(r_UBCF, getData(e4, "known"), type="ratings")
+  rmse_ <- calcPredictionAccuracy(p_UBCF, getData(e4, "unknown"))[1]
+  
+  toc(log=TRUE,quiet = FALSE)
+  
+  print(paste( rmse_, " is RMSE"))
+  gc()
+  print(identical(sparse_m,sparse_m2))
+  return(list(perc = t[1] , given = t[2], nn=t[3] , rmse = rmse_))
+  
+})
+
+log_full_test <- tic.log(format = TRUE)
 
+full_test_UBCF
+log_full_test
 
+df <- data.frame(matrix(unlist(full_test_UBCF), nrow=125, byrow=TRUE),stringsAsFactors=FALSE)
 
-identical(edx,edx.copy)
+df
+which.min(df$X4)
+min(df$X4)
 
 
-class(edx$movieId)
- c(length(unique(edx$userId)),
-         length(unique(edx$movieId)))
+#This tells us that 0.1 quantile reduction , 8 as given and 15 as nn give us the best RMSE of 1.024183
 
- c(length(unique(edx.copy$userId)),
-   length(unique(edx.copy$movieId)))
- 
-edx_backup <- edx
+#We will keep reduction parameter at 0.9
 
-sparse_m <- sparseMatrix(
-              i = as.numeric(as.factor(edx$userId)),
-              j = as.numeric(as.factor(edx$movieId)), 
-              x = edx$rating,
-             dims = c(length(unique(edx$userId)),
-                      length(unique(edx$movieId))),
-             dimnames = list(paste("u", 1:length(unique(edx$userId)), sep = ""),
-                             paste("m", 1:length(unique(edx$movieId)), sep = "")))
+#Let us try the POPULAR method
+sparse_m <- create_sparse_m()
+#Reduction parameter
+y=0.9
+min_movies_by_user <- quantile(rowCounts(sparse_m),y)
+min_ratings_per_movie<- quantile(rowCounts(sparse_m),y)
 
-sparse_m <- new("realRatingMatrix", data = sparse_m)
+sparse_m_limited <- sparse_m[rowCounts(sparse_m)>=min_movies_by_user, colCounts(sparse_m)>=min_ratings_per_movie]
+#Mamking the model
+model_popular <- Recommender(sparse_m_limited, method="POPULAR", param=list(normalize="center"))
+#Testing prediction
+pred_pop <- predict(model_popular, sparse_m[1:10], type="ratings")
 
+as(pred_pop, "matrix")[,1:10]
+#Finding RMSE
+e5 <- evaluationScheme(sparse_m_limited , method="split", train=0.9,
+                       k=1, given=8)
+p_POPULAR <- predict(model_popular, getData(e5, "known"), type="ratings")
+rmse_POP <- calcPredictionAccuracy(p_POPULAR, getData(e5, "unknown"))[1]
 
-#In order to use the evaluation scheme from reccomenderlab, we need to specify the minimum number of ratings that a user makes to qualify for being taken into account for the model
+rmse_POP
 
-given <- min(rowCounts(sparse_m))
 
+#Let us try the IBCF method
+sparse_m <- create_sparse_m()
+#Reduction parameter
+y=0.9
+min_movies_by_user <- quantile(rowCounts(sparse_m),y)
+min_ratings_per_movie<- quantile(rowCounts(sparse_m),y)
 
-eval <- evaluationScheme(sparse_m, method="split", train=0.9, given=given, k=1)
+sparse_m_limited <- sparse_m[rowCounts(sparse_m)>=min_movies_by_user, colCounts(sparse_m)>=min_ratings_per_movie]
+#Mamking the model
+model_ibcf <- Recommender(sparse_m_limited, method="IBCF", param=list(normalize="center"))
+#Testing prediction
+pred_pop <- predict(model_ibcf, sparse_m[1:10], type="ratings")
 
-any(rowCounts(sparse_m)<5)
+as(pred_pop, "matrix")[,1:10]
+#Finding RMSE
+e6 <- evaluationScheme(sparse_m_limited , method="split", train=0.9,
+                       k=1, given=8)
+p_IBCF <- predict(model_ibcf, getData(e6, "known"), type="ratings")
+rmse_IBCF <- calcPredictionAccuracy(p_IBCF, getData(e6, "unknown"))[1]
 
-which(rowCounts(sparse_m)<10)
+rmse_IBCF
 
-#UBCF_model <- Recommender(sparse_m,method="UBCF",param=list(normalize = "center"))
 
-UBCF_model <- Recommender(getData(eval, "train"), method = "UBCF",
-                     param=list(normalize = "center", method="Cosine", nn=50))
 
-#Next staement predicts for known data? It crashed out after 6+ hours
-pred_UBCF <- predict(UBCF_model, getData(eval, "known"), type="ratings")
 
-#This statement has run for 4 hours now and is still running.Stopped with an error.
-pred_UBCF <- predict(UBCF_model, getData(eval, "unknown"), type="ratings")
 
 
-#Trying prediction for one user with few ratings
-pred_UBCF <- predict(UBCF_model, getData(eval, "unknown")[9], type="ratings")
 
-#Algorithm predicted 1671 movies?? Didn't predict movies required? User number is with a decimal???
-length(as(pred_UBCF, "list")[[1]])
+#---------------------------------------------------Recosystem Model -----------------------------------------------------------------------
 
-#Next statement yeilds a variabl size of 9 MB
-unknown <- getData(eval, "unknown")
 
-unknown[1]
+#Lets try Matrix Factorization with GD
 
-which(rowCounts(unknown)<10)
+test_GD <- as.matrix (test_set [,1:3])
+train_GD <- as.matrix(test_set [,1:3])
+glimpse(test_GD)
 
-length(as(unknown, "list")[[1]])
+valid_GD <-as.matrix(validation [,1:3])
 
-as(unknown, "matrix")[[9]]
-as(unknown, "list")[9]
+set.seed(1)
 
-class(pred_UBCF)
-class(unknown)
+train_GD_2 <- data_memory(train_GD[,1],train_GD[,2],train_GD[,3])
+test_GD_2 <- data_memory(test_GD[,1],test_GD[,2],test_GD[,3])
+valid_GD_2 <- data_memory(valid_GD[,1],valid_GD[,2],valid_GD[,3])
 
-#Was looking for movie id 163 but doesn't exist in prediction
-as(pred_UBCF, "list")[[1]][91]
+#Next step is to build Recommender object
+r = Reco()
+# Matrix Factorization :  tuning training set
+opts = r$tune(train_GD_2, opts = list(dim = c(10, 20, 30), lrate = c(0.1, 0.2),
+                                     costp_l1 = 0, costq_l1 = 0,
+                                     nthread = 1, niter = 10))
+opts
 
-#data frame doesn't work
-as(unknown, "data.frame")[[9]]
+r$train(train_GD_2, opts = c(opts$min, nthread = 1, niter = 20))
 
-length(as(pred_UBCF, "list")[[1]])
+pred <- r$predict(test_GD_2, out_memory())
 
+rmse_MFGD <- RMSE(pred,test_set$rating)
 
-as(pred_UBCF, "list")
+pred_v <- r$predict(valid_GD_2, out_memory())
 
-head(as(pred_UBCF, "data.frame"))
+RMSE(pred_v,validation$rating)
 
+rmse_results
 
-#These statements havn't yet run
-rmse_ubcf <- calcPredictionAccuracy(pred_UBCF, getData(eval, "unknown")[1:100])[1]
-rmse_ubcf
-
-class(getData(eval, "known"))
-
-pred_UBCF_validation <-predict(UBCF_model,)
-
-#Calculation of rmse for UBCF method
-
-
-
-
-
-
-
-#ratings of 30% of users are excluded for testing
-model_pop <- Recommender(getData(eval, "train"), "POPULAR")
-
-prediction_pop <- predict(model_pop, getData(eval, "unknown"), type="ratings")
-
-temp2<- getData(eval, "train")
-temp<- getData(eval, "known")
-
-as(prediction_pop, "list")[[9]]
-prediction_pop
-
-rmse_pop <- calcPredictionAccuracy(prediction_pop, getData(eval, "known"))[1]
-rmse_pop
-
-
-getRatingMatrix(prediction_pop[c(1:5),c(1:4)])
-
-nratings(getData(eval, "known")[1])
-
-hist(getRatings(prediction_pop), breaks="FD")
-
-hist(getRatings(getData(eval, "known")), breaks="FD")
-
-
-hist(getRatings(sparse_m), breaks="FD")
-
-
-removeKnownRatings()
-
-
-nratings(prediction_pop[1])
-
-getRatingMatrix(getData(eval, "known")[c(1:5),c(1:4)])
-#Something is wrong. UserId is blank for some rows. 
-
-
-getRatingMatrix(sparse_m[c(1:5),c(1:4)])
-
-eval <- evaluationScheme(sparse_m, 
-                         method="split", 
-                         train=0.9,
-                         given=given,
-                         k=1)
-
-#this takes too long to execute. There must be something wrong that it is doing. It takes no time to create an index to separate data.
-
-
-
-eval <- evaluationScheme(sparse_m, 
-                         method="split", 
-                         train=0.9,
-                         given=-7)
-
-
-
-getRatingMatrix(sparse_m[c(1:5),c(1:4)])
-
-getRatingMatrix(getData(eval, "known")[c(1:5),c(1:4)])
-
-getRatingMatrix(getData(eval, "unknown")[c(1:5),c(1:4)])
-
-
-getRatingMatrix(getData(eval, "unknown")[,1])
-#model <- Recommender(getData(eval, "known", 
- #                    method = "UBCF", 
-  #                   param = list(method = "pearson", nn = 50)))
-
-
-UBCF_model <- Recommender(getData(eval, "train"), 
-                          method = "UBCF",
-                          param=list(method="Cosine", nn=50))
-
-
-prediction <- predict(UBCF_model, sparse_m[9, ], type = "ratings")
-
-as(prediction, 'data.frame') %>% 
-  arrange(-rating) %>% .[1:5,] 
-
-sparse_m[9,]
-
-getRatingMatrix(prediction)
-getRatingMatrix(sparse_m[9])
-
-
-rowCounts(sparse_m[9])
-
-rowc
-
-gc()
-
-
-
-#What if there is no movie number x? How can I pasete names to create a realrating matrix
-
-temp<- edx %>% group_by(movieId) %>%
-  summarise(n=n())%>%
-  arrange(movieId)
-
-#Found out there is no movie number 91.
-
-colCounts(sparse_m)
-
-#And there is no column 91 either. Pasting names will work.
-
-
-temp<- edx %>%
-  select(userId,movieId,rating)%>%
-  spread(movieId,rating)%>%
-  as.matrix()
-
-dimnames(temp)
-
-
-rm(temp)
-
-dim(sparse_m)
-
-dimnames(sparse_m)
-
-view(sparse_m[1:10])
-
-rownames(sparse_m@data)
-
-length(unique(edx$userId))
-length(unique(edx$movieId))       
-       
-
-length(unique(validation$userId))
-length(unique(validation$movieId))    
-       
-head(sparse_m)
-view(train_set[1:50] )
-
-
-as(sparse_m, "matrix") [1:10,1:10]
-
-head(sparse_m)
-head(rowCounts(sparse_m))
-dimnames(sparse_m)
-
-str(sparse_m)
-predict(UBCF_model,sparse_m,type="ratings",data=sparse_m_test)
-
-as(predict(UBCF_model,sparse_m[1:10],type="ratings"),"matrix")[,1:10]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-###Checking how it is done
-
-MovieLense100 <- MovieLense[rowCounts(MovieLense) >100,]
-class(MovieLense100[101:102])
-
-glimpse(edx)
-
-## predict ratings for new users
-rec <- Recommender(train, method = "POPULAR")
-#didn't work
-
-rec <- Recommender(MovieLense100[1:50],method="UBCF",param=list(normalize = "center"))
-pre <- predict(rec, MovieLense100[101:102], type="ratings")
-pre
-as(pre, "matrix")[,1:10]
-
-
-as(MovieLense100[,100:102],"matrix")
-
-rm(list=ls(pattern="^MovieL"))
-
-###
-
-
-
-
-
-
-
-
-
-
+#------------Time Effect
 
 
 
@@ -632,12 +571,12 @@ top_users <- data %>%
   summarise(n=n(), first_rating= min(timestamp))
 
 #%>%
- # top_n(10)
+# top_n(10)
 
 #See how their rating changes over time
 data%>%
-#  filter(userId %in% top_users$userId) %>%
-#  filter(userId==58357) %>%
+  #  filter(userId %in% top_users$userId) %>%
+  #  filter(userId==58357) %>%
   left_join(top_users, by="userId") %>%
   mutate(date = as.Date(as.POSIXct(timestamp - first_rating, origin = "1970-01-01") )) %>%
   mutate(month = floor_date(date, unit = "month")) %>%
@@ -645,7 +584,7 @@ data%>%
   summarise(avg_rating = mean(rating)) %>%
   ggplot(
     aes(month,avg_rating)#,color=as.factor(userId))
-    )+
+  )+
   geom_line()
 #+ scale_x_date(month = "%b/%d")
 
@@ -660,13 +599,6 @@ data%>% filter(userId==58357) %>%
 #check how ratings of particular genres changed over time?
 
 #  scale_x_date(date_labels = "%b/%d")
-
-
-
-
-###
-
-
 
 df <- tibble(date, value) %>% 
   group_by(month = floor_date(date, unit = "month")) %>%
@@ -684,5 +616,127 @@ data[1:10] %>%
   mutate(release_year = substr(title,nchar(title)-4,nchar(title)-1))%>%
   group_by(movieId)%>%
   summarise(Time_Since_1st= min(timestamp))
-  
 
+
+
+
+mu <- mean(data$rating)
+mu_rep<-do.call("rbind", replicate(length(test_set), mu, simplify = FALSE))
+
+#We make a a dataframe as long as test_set with mu repeated as R Markdown interprets the difference in length between mu and test_set as an error.
+
+naive_rmse <- RMSE(test_set$rating,mu_rep)
+naive_rmse
+
+rmse_results <- tibble(method = "Just the average", RMSE = naive_rmse)
+
+
+
+
+
+temp3 <- validation %>% select(c(Romance:IMAX))  
+
+pred <- predict.lm(lm_fit, newdata = temp3)
+
+predicted_ratings <- 
+  validation %>% 
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  mutate(rat = mu + b_i + b_u + pred) %>%
+  pull(rat)
+
+any(is.na( predicted_ratings))
+
+glimpse(predicted_ratings)
+length(predicted_ratings)
+length(validation$rating)
+RMSE(predicted_ratings, validation$rating)
+RMSE(as.data.frame(predicted_ratings),as.data.frame(validation$rating))
+
+
+sqrt(mean((validation$rating - predicted_ratings)^2))
+any(is.na((validation$rating - predicted_ratings)^2))
+
+
+
+class(predicted_ratings)
+class(validation$rating)
+any(is.na(predicted_ratings))
+any(is.na(validation$rating))
+
+
+any(is.na(pred))
+
+
+which(is.na(predicted_ratings))
+
+rmse_genre_effect_final <- RMSE(predicted_ratings, validation$rating)
+
+rmse_genre_effect_final 
+rmse_results_final <- tibble(method = "Regularized user & Movie effects with Genre (lm)", RMSE = rmse_genre_effect_final)
+
+rm(temp3)
+#rmse_results <- rmse_results %>% add_row(method ="Regularized user & Movie effects with Genre (lm)", RMSE =min(rmse_genre_effect))
+rmse_results_final
+
+
+
+#recal with edX set
+
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+  
+  mu <- mean(edx$rating)
+  
+  b_i <- edx %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  
+  b_u <- edx %>% 
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+  
+  predicted_ratings <- 
+    validation %>% 
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    mutate(pred = mu + b_i + b_u) %>%
+    pull(pred)
+  
+  return(RMSE(predicted_ratings, validation$rating))
+})
+
+lambda <- lambdas[which.min(rmses)]
+b_i <- edx %>% 
+  group_by(movieId) %>%
+  summarize(b_i = sum(rating - mu)/(n()+lambda))
+
+b_u <- edx %>% 
+  left_join(b_i, by="movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = sum(rating - b_i - mu)/(n()+lambda))
+
+
+genre_train <- edx %>% 
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  mutate(residual = rating - mu- b_i-b_u) 
+
+temp <- genre_train %>% select(c(Romance:IMAX,residual)) 
+lm_fit <-   lm(residual ~ ., data=temp)
+
+temp2 <- validation %>% select(c(Romance:IMAX))  
+
+pred <- predict.lm(lm_fit, newdata = temp2)
+
+predicted_ratings <- 
+  validation %>% 
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  mutate(pred = mu + b_i + b_u + pred) %>%
+  pull(pred)
+
+
+rmse_genre_effect <- RMSE(predicted_ratings, validation$rating)
