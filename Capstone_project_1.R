@@ -1,4 +1,4 @@
-#CAPSTONE Project
+#CAPSTONE Project 1 Recommendation system
 
 
 
@@ -740,3 +740,187 @@ predicted_ratings <-
 
 
 rmse_genre_effect <- RMSE(predicted_ratings, validation$rating)
+
+
+
+
+#Testing Hour effect
+
+edx %>% 
+  mutate(hour = hour(as_datetime(timestamp))) %>%
+  group_by(hour) %>%
+  summarize(rating = mean(rating)) %>%
+  ggplot(aes(hour, rating)) +
+  geom_point() + 
+  geom_smooth() + 
+  ggtitle("Rating evolution by hour")+
+  theme_economist()
+
+
+
+#There seems to be a strong time effect based on hour.
+
+
+
+
+
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+  
+  mu <- mean(train_set$rating)
+  
+  b_i <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  
+  b_u <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+  
+  b_t <- train_set %>%
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    mutate(hour = hour(as_datetime(timestamp))) %>%
+    group_by(hour) %>%
+    summarize(b_t = sum(rating - mu - b_i - b_u)/(n()+l) ) 
+  
+  predicted_ratings <- 
+    test_set %>% 
+    mutate(hour = hour(as_datetime(timestamp))) %>%
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    left_join(b_t, by = "hour") %>%
+    mutate(pred = mu + b_i + b_u + b_t) %>%
+    pull(pred)
+  
+  return(RMSE(predicted_ratings, test_set$rating))
+})
+
+lambda <- lambdas[which.min(rmses)]
+
+qplot(lambdas,rmses)
+
+b_i <- train_set %>% 
+  group_by(movieId) %>%
+  summarize(b_i = sum(rating - mu)/(n()+lambda))
+
+b_u <- train_set %>% 
+  left_join(b_i, by="movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = sum(rating - mu -b_i)/(n()+lambda))
+
+b_t <- train_set %>%
+  left_join(b_i, by="movieId") %>%
+  left_join(b_u, by="userId") %>%
+  mutate(hour = hour(as_datetime(timestamp))) %>%
+  group_by(hour) %>%
+  summarize(b_t = sum(rating - mu - b_i - b_u)/(n()+lambda) ) 
+
+predicted_ratings <- 
+  test_set %>% 
+  mutate(hour = hour(as_datetime(timestamp))) %>%
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  left_join(b_t, by = "hour") %>%
+  mutate(pred = mu + b_i + b_u + b_t) %>%
+  pull(pred)
+
+RMSE(predicted_ratings, test_set$rating)
+
+RMSE_Reg_w_t<-RMSE(predicted_ratings, test_set$rating)
+
+
+#------------------------------- Applying Final regression model on validation set----------------------------------------------------------
+
+
+
+genre_train <- train_set %>% 
+  mutate(hour = hour(as_datetime(timestamp))) %>%
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId") %>%
+  left_join(b_t, by = "hour") %>%
+  mutate(residual = rating - mu- b_i-b_u-b_t ) 
+
+temp <- genre_train %>% select(c(Romance:IMAX,residual)) 
+lm_fit <-   lm(residual ~ ., data=temp)
+
+temp2 <- test_set %>% select(c(Romance:IMAX))  
+
+pred <- predict.lm(lm_fit, newdata = temp2)
+
+predicted_ratings <- 
+  test_set %>% 
+  mutate(hour = hour(as_datetime(timestamp))) %>%
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId")%>%
+  left_join(b_t, by = "hour") %>%
+  mutate(pred = mu + b_i + b_u + b_t + pred) %>%
+  pull(pred)
+
+
+rmse_genre_effect <- RMSE(predicted_ratings, test_set$rating)
+
+rmse_results <- rmse_results %>% add_row(method ="Regularized user,movie,time effects with Genre (lm)",
+                                         RMSE =min(rmse_genre_effect))
+
+rm(temp,temp2)
+
+rmse_results
+
+
+summary(lm_fit)$coefficients
+
+#somehow, 8 validation set items aren't a part of the test and validation set
+
+# Probably because we didn't semijoin on genre 
+
+#With only 8 it wont make a difference to RMSE
+
+
+na_index
+
+val_set <- validation[-na_index]
+
+pred <- predict.lm(lm_fit, newdata = temp2)
+
+predicted_ratings_validation 
+
+val_set <- val_set %>% 
+  mutate(Romance = ifelse(str_detect(genres,"Romance"),1,0),
+             Comedy = ifelse(str_detect(genres,"Comedy"),1,0),
+             Action = ifelse(str_detect(genres,"Action"),1,0),
+             Crime = ifelse(str_detect(genres,"Crime"),1,0),
+             Thriller = ifelse(str_detect(genres,"Thriller"),1,0),
+             Drama = ifelse(str_detect(genres,"Drama"),1,0),
+             Sci_Fi = ifelse(str_detect(genres,"Sci-Fi"),1,0),
+             Adventure = ifelse(str_detect(genres,"Adventure"),1,0),
+             Children = ifelse(str_detect(genres,"Children"),1,0),
+             Fantasy = ifelse(str_detect(genres,"Fantasy"),1,0),
+             War = ifelse(str_detect(genres,"War"),1,0),
+             Animation = ifelse(str_detect(genres,"Animation"),1,0),
+             Musical = ifelse(str_detect(genres,"Musical"),1,0),
+             Western = ifelse(str_detect(genres,"Western"),1,0),
+             Mystery = ifelse(str_detect(genres,"Mystery"),1,0),
+             Film_Noir = ifelse(str_detect(genres,"Film-Noir"),1,0),
+             Horror = ifelse(str_detect(genres,"Horror"),1,0),
+             Documentary = ifelse(str_detect(genres,"Documentary"),1,0),
+             IMAX = ifelse(str_detect(genres,"IMAX"),1,0)) %>%
+  mutate(hour = hour(as_datetime(timestamp))) %>%
+  left_join(b_i, by = "movieId") %>%
+  left_join(b_u, by = "userId")%>%
+  left_join(b_t, by = "hour")
+  
+genre_pred <- predict.lm(lm_fit, newdata = val_set)
+
+ 
+predicted_ratings_Validation<-val_set%>%
+  cbind(genre_pred)%>%
+  mutate(pred = mu + b_i + b_u + b_t + genre_pred) %>%
+  pull(pred)
+
+#na_index <-which(is.na(predicted_ratings_Validation))
+
+
+RMSE(predicted_ratings_Validation,val_set$rating)

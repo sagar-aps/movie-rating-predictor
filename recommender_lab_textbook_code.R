@@ -5,6 +5,12 @@ library(dplyr)
 ### recommender for real-valued ratings
 data(Jester5k)
 ## create 90/10 split (known/unknown) for the first 500 users in Jester5k
+
+min(rowCounts(Jester5k[1:500,]))
+
+min(rowCounts(Jester5k))
+
+
 e <- evaluationScheme(Jester5k[1:500,], method="split", train=0.9,
                       k=1, given=15)
 e
@@ -63,7 +69,7 @@ nratings(getData(e, "unknown")["u7147"])
 calcPredictionAccuracy(p, getData(e, "unknown"))
 head(calcPredictionAccuracy(p, getData(e, "unknown"), byUser=TRUE))
 
-length(getData(e, "unknown")
+length(getData(e, "unknown"))
        
 
 hist(getRatings(p), breaks="FD")

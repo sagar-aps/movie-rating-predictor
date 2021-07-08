@@ -3,16 +3,8 @@ title: 'Capstone Project 1: Reccomender'
 author: "Sagar Apshankar"
 date: "5/13/2021"
 output:
-  pdf_document: default
-  latex_engine: default
-editor_options:
-  markdown:
-    wrap: 100
+  pdf_document 
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ## Introduction
 
@@ -20,16 +12,17 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Recommendation systems seek to predict the preference a user would give
 to an item based on other preferences the user has expressed and the
-preferences of other users the the item in question. Recommendation
+preferences of other users pertaining to the item in question. Recommendation
 systems are one of the most ubiquitous applications of Machine Learning.
 They are used by e-marketplaces such as Amazon and streaming platforms
 such as Netflix. In fact, in 2006, Netflix offered a prize of 1 million
 USD to whoever that could increase the accuracy of their recommendation
-engine by 10%. In this assignment, we evaluate different algorithms to
-arrive at the lowest Root Mean Squared Error(RMSE). The best performing
-model of those evaluated was recosystem Matrix Factorization algorithm
-followed by Linear Regression with Regularized Movie, User and Genre
-effect. The respective RMSEs were 0.858 and 0.865.
+engine by 10%. In this assignment, we evaluate different algorithms to try and
+predict the rating of users for movies. We evaluate our prediction by 
+minimizing Root Mean Squared Error(RMSE) between predicted and real ratings from
+a test set. The best performing model of those evaluated was recosystem Matrix 
+Factorization algorithm followed by Linear Regression with Regularized Movie, 
+User and Genre effects. The respective RMSEs were 0.858 and 0.865.
 
 ### Executive Summary
 
@@ -51,21 +44,44 @@ on the hold-out validation set.
 
 The following libraries are needed at different points in the analysis.
 
-```{r libraries}
+```{r libraries , message=FALSE}
 
-library(dplyr) #for %>% and other basic functions
-library(tidyverse) 
-library(caret) #for createdatapartition function
-library(data.table) 
-library(ggplot2) #for graphics
-library(stringr) #for genre decoding
-library(tidyr)
-library(caret) #for CreateDataPartition
-library(Matrix) #for SparseMatrix
-library(recosystem) #for Matrix Factorization model
-library(ggthemes) #for ggplot theme economist
-library(lubridate) #for dealing with dates
-library(recommenderlab) #for UBCF,IBCF, POPULAR models
+
+packages_required <-c("dplyr", # Wrangling
+  "ggplot2", #for graphics
+  "stringr", #string operations
+  "tidyr", # Wrangling
+  "caret", #for CreateDataPartition and train()
+  "ggthemes", #for graphics themes
+  "lubridate", #for dealing with dates
+  "tidyverse", # Wrangling
+  "data.table", #for wrangling
+  "Matrix", #for SparseMatrix
+  "recosystem", #for Matrix Factorization model
+  "ggthemes", #for ggplot theme economist
+  "recommenderlab",#for UBCF,IBCF, POPULAR models
+  "knitr" #for RMD options 
+  ) 
+
+using<-function(...) {
+  libs<-unlist(list(...))
+  req<-unlist(lapply(libs,require,character.only=TRUE))
+  need<-libs[req==FALSE]
+  if(length(need)>0){ 
+    install.packages(need)
+    lapply(need,require,character.only=TRUE)
+  }
+}
+
+
+using(packages_required)
+
+
+knitr::opts_chunk$set(cache = TRUE, warning = FALSE, 
+                      message = FALSE, cache.lazy = FALSE)
+
+options(tinytex.verbose = TRUE)
+
 ```
 
 The following code downloads the data, partitions it deterministically
@@ -76,6 +92,8 @@ contain any users or movies exclusively.
 ##########################################################
 # Create edx set, validation set (final hold-out test set)
 ##########################################################
+
+knitr::opts_chunk$set(cache = TRUE) #Don't re-run code unless it has changed
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -131,23 +149,29 @@ up a movie rating.
 #### Basic Characteristics
 
 ```{r basic exploration}
-nrow(edx)
-ncol(edx)
-edx %>% filter(rating==0) %>% head()
-edx %>% filter(rating>5) %>% head()
-edx %>% distinct(movieId) %>% count()
-edx %>% distinct(userId) %>% count()
+
+paste("The dataset has " , nrow(edx) , "ratings")
+paste("There are " , ncol(edx), "columns")
+
+#Checking data validity
+
+paste("There are " , edx %>% filter(rating==0) %>% nrow(), "ratings = 0")
+paste("There are " , edx %>% filter(rating>5) %>% nrow(), "ratings > 5")
+
+
+paste("There are " , edx %>% distinct(movieId) %>% count(), "distinct movies")
+paste("There are " ,edx %>% distinct(userId) %>% count(), "distinct users")
 summary(edx)
 glimpse(edx)
 ```
 
-The dataframe provided has 9000055 rows and 6 columns. The ratings are
+We see that the dataframe provided has 9000055 rows and 6 columns. The ratings are
 between 0 and 5 with missing values represented by 0. There are 10677
 distinct movies and 69878 distinct users.
 
 From the summary, we have the mean rating at 3.512 and the median at 4.
 
-From glimpse, we understand that variablility in the rating may come
+From glimpse, we understand that variability in the rating may come
 from any combination of the user, movie, timestamp and genre.
 
 #### Effects and distribution
@@ -221,7 +245,8 @@ qplot(movie_avgs$b_i,bins=10,color=I("red"))
 ```
 
 From this plot, it is clear that there is a lot of variability in the
-way movies are rated. In other words, there is a "movie effect".
+way movies are rated. There exists a "movie effect"., in other words, 
+each movie is rated differently.
 
 ```{r mean, user preference}
 mu <- mean(edx$rating)
@@ -234,9 +259,9 @@ qplot(user_avgs$b_u,bins=10,color=I("red"))
 
 ```
 
-We see from the histogram that more users are easily pleased but there
-do exist some hard-to-please or cranky users. Isolating the user effect
-is thus a good idea.
+We see from the histogram that more users are easily pleased because there are 
+more individuals who give a rating above the mean, but there do exist some 
+hard-to-please or cranky users. Isolating the user effect is thus a good idea.
 
 We will now examine the genres to see if certain genres are rated better
 than others. Since the genres are grouped and joined, we will need to
@@ -244,6 +269,7 @@ encode them into separate columns first.
 
 ```{r mean, genre effect}
 
+knitr::opts_chunk$set(cache = TRUE)
 #The following code is decodes the genre data by adding a 0 or an NA based on 
 #whether the name of the genre is present in the genre column
 n_a=NA
@@ -292,9 +318,8 @@ genre_data %>%
 Clearly, the genre effect is quite pronounced and we will choose it as a
 part of our model.
 
-The last aspect to check is that of the time of rating. We don't explore
-the aspect in detail here but we could extract the year from the title to 
-see if older or newer movies have any pattern in their ratings.
+The last aspect to check is that of the time of rating. Lets check if the 
+average rating moves over time. 
 
 ```{r time effect}
 #Here, we use functions from the lubridate package to extract the week from the timestamp
@@ -311,7 +336,24 @@ edx %>%
 
 Plotting the rating week wise, we observe a very weak effect, if any.
 The rating decreases slightly and then increases near the end of the
-timeline. We will not be incorporating the time effect into our model.
+timeline. We will not be incorporating the week effect into our model.
+
+let us check if the hour of day has an effect on ratings.
+
+```{r hour effect}
+edx %>% 
+  mutate(hour = hour(as_datetime(timestamp))) %>%
+  group_by(hour) %>%
+  summarize(rating = mean(rating)) %>%
+  ggplot(aes(hour, rating)) +
+  geom_point() + 
+  geom_smooth() + 
+  ggtitle("Rating evolution by hour")+
+  theme_economist()
+
+```
+The hour seems to have a significant inpact on the rating. Presumably, 
+people who choose to watch movies at very late hours are harsher critics.
 
 ## Data Preprocessing
 
@@ -366,8 +408,13 @@ items in the test set exist in the training set also.
 ```{r Training and test sets}
 
 
-#We divide the data into training and test sets. Before this, we set a seed to ensure that the work is reproducible
-#The index already made in the first code chunk was to separate the validation set so we need to remake the index
+#We divide the data into training and test sets. 
+#Before this, we set a seed to ensure that the work is reproducible
+#The index already made in the first code chunk was to separate 
+#the validation set so we need to remake the index
+
+
+#We choose an 80/20 split, the standard in ML
 
 test_index <- createDataPartition(y = data$rating, times = 1, p = 0.2, list = FALSE)
 
@@ -463,7 +510,7 @@ on our validation set to choose a winner.
 
 During model building, we must use only the train_set.
 
-#### Regression Models using movie, user, genre
+#### Regression Models using movie, user, genre, time
 
 The most simplistic model envisagable consists of predicting the mean
 for all the ratings. This can be described like this:
@@ -480,7 +527,7 @@ $$
 #We make a a dataframe as long as test_set with mu repeated as R Markdown 
 #interprets the difference in length between mu and test_set as an error.
   
-  naive_rmse <- RMSE(test_set$rating,mu)
+  naive_rmse <- RMSE(test_set$rating,rep(mu,nrow(test_set)))
   naive_rmse
   
   rmse_results <- tibble(method = "Just the average", RMSE = naive_rmse)
@@ -507,6 +554,8 @@ Let us start with calculating $b_i$ and $b_u$ and testing our model.
 Here $b_i$ will be average of $Y_{u,i} - \mu$ and $b_u$ will be average of $Y_{u,i} - \mu - b_i$
 
 ```{r avgs}
+knitr::opts_chunk$set(cache = TRUE)
+
 movie_avgs <- train_set %>% 
   group_by(movieId) %>% 
   summarize(b_i = mean(rating - mu))
@@ -574,10 +623,13 @@ $$
 However, we need to choose a $\lambda$ carefully as we don't want to
 penalize prolific users or good movies. $\lambda$ thus becomes a tuning
 parameter and we can run a loop to identify the value which minimizes
-our RMSE. The following code does that and plots $\lambda$ against the
-rmse.
+our RMSE. 
+
+The following code does that and plots $\lambda$ against the
+rmse. 
 
 ```{r lambda}
+knitr::opts_chunk$set(cache = TRUE)
 
 lambdas <- seq(0, 10, 0.25)
 
@@ -614,7 +666,7 @@ b_u <- train_set %>%
     group_by(userId) %>%
     summarize(b_u = sum(rating - b_i - mu)/(n()+lambda))
 
-
+gc()
 qplot(lambdas,rmses)
 
 ```
@@ -628,6 +680,75 @@ rmse_results
 
 
 ```
+We can add in the same way the time effect. Since fewer movies will be rated at 
+night, we can subject time to the same regularization.
+
+```{r regul movie user time}
+
+
+lambdas <- seq(0, 10, 0.25)
+
+rmses <- sapply(lambdas, function(l){
+  
+  mu <- mean(train_set$rating)
+  
+  b_i <- train_set %>% 
+    group_by(movieId) %>%
+    summarize(b_i = sum(rating - mu)/(n()+l))
+  
+  b_u <- train_set %>% 
+    left_join(b_i, by="movieId") %>%
+    group_by(userId) %>%
+    summarize(b_u = sum(rating - b_i - mu)/(n()+l))
+  
+  b_t <- train_set %>%
+    left_join(b_i, by="movieId") %>%
+    left_join(b_u, by="userId") %>%
+    mutate(hour = hour(as_datetime(timestamp))) %>%
+    group_by(hour) %>%
+    summarize(b_t = sum(rating - mu - b_i - b_u)/(n()+l) ) 
+  
+  predicted_ratings <- 
+    test_set %>% 
+    mutate(hour = hour(as_datetime(timestamp))) %>%
+    left_join(b_i, by = "movieId") %>%
+    left_join(b_u, by = "userId") %>%
+    left_join(b_t, by = "hour") %>%
+    mutate(pred = mu + b_i + b_u + b_t) %>%
+    pull(pred)
+  
+  return(RMSE(predicted_ratings, test_set$rating))
+})
+
+
+lambda <- lambdas[which.min(rmses)]
+
+b_i <- train_set %>% 
+  group_by(movieId) %>%
+  summarize(b_i = sum(rating - mu)/(n()+lambda))
+
+b_u <- train_set %>% 
+  left_join(b_i, by="movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = sum(rating - mu -b_i)/(n()+lambda))
+
+b_t <- train_set %>%
+  left_join(b_i, by="movieId") %>%
+  left_join(b_u, by="userId") %>%
+  mutate(hour = hour(as_datetime(timestamp))) %>%
+  group_by(hour) %>%
+  summarize(b_t = sum(rating - mu - b_i - b_u)/(n()+lambda) )
+
+qplot(lambdas,rmses)
+
+gc()#Garbage collection
+
+rmse_results <- rmse_results %>% add_row(method ="Regularized user,movie,time effects",
+                                         RMSE =min(rmses))
+
+```
+
+
 
 While the number of movies and users is very high, the number of genres
 is low at 19. We can thus use the lm() function to make a linear
@@ -639,18 +760,27 @@ multiplied and added for each row. Our final regression model, thus will
 look like this.
 
 $$
-\frac{1}{N} \sum_{u,i} \left(y_{i,u} - \mu - b_i - b_u \right)^2 + 
-\lambda \left(\sum_{i} b_i^2 + \sum_{u} b_u^2\right) +
+\frac{1}{N} \sum_{u,i} \left(y_{i,u} - \mu - b_i - b_u - b_t \right)^2 + 
+\lambda \left(\sum_{i} b_i^2 + \sum_{u} b_u^2 + \sum_{t} b_t^2 \right) +
 \sum_{g} k_gc_g
 \tag{3} 
 $$
 
+
+
+
+
+
 ```{r genre lm}
+
+
 invisible(gc())
 genre_train <- train_set %>% 
+  mutate(hour = hour(as_datetime(timestamp))) %>%
   left_join(b_i, by = "movieId") %>%
   left_join(b_u, by = "userId") %>%
-  mutate(residual = rating - mu- b_i-b_u) 
+  left_join(b_t, by = "hour") %>%
+  mutate(residual = rating - mu- b_i-b_u-b_t ) 
 
 temp <- genre_train %>% select(c(Romance:IMAX,residual)) 
 lm_fit <-   lm(residual ~ ., data=temp)
@@ -661,15 +791,17 @@ pred <- predict.lm(lm_fit, newdata = temp2)
 
 predicted_ratings <- 
   test_set %>% 
+  mutate(hour = hour(as_datetime(timestamp))) %>%
   left_join(b_i, by = "movieId") %>%
-  left_join(b_u, by = "userId") %>%
-  mutate(pred = mu + b_i + b_u + pred) %>%
+  left_join(b_u, by = "userId")%>%
+  left_join(b_t, by = "hour") %>%
+  mutate(pred = mu + b_i + b_u + b_t + pred) %>%
   pull(pred)
 
 
 rmse_genre_effect <- RMSE(predicted_ratings, test_set$rating)
 
-rmse_results <- rmse_results %>% add_row(method ="Regularized user & Movie effects with Genre (lm)",
+rmse_results <- rmse_results %>% add_row(method ="Regularized user,movie,time effects with Genre (lm)",
                                          RMSE =min(rmse_genre_effect))
 
 rm(temp,temp2)
@@ -677,6 +809,17 @@ rm(temp,temp2)
 rmse_results
 
 ```
+
+We can also check the linear modeling coefficients produced by our mode like
+this.
+
+```{r lm coeffs}
+
+summary(lm_fit)$coefficients
+
+```
+
+
 
 We see that we have managed to reduce the RMSE to 0.8650. We will now
 explore packaged collaborative filtering algorithms from recommenderlab
@@ -716,6 +859,8 @@ recommenderlab doesn't allow for them to be used externally. Tuning code
 has not been included as it takes too much time to run.
 
 ```{r UBCF Reccomenderlab}
+
+knitr::opts_chunk$set(cache = TRUE)
   
   y=0.9
   sparse_m <- create_sparse_m()
@@ -742,6 +887,9 @@ items, he will like other items similar to it. It is similary slow to
 compute. Here is the code to implement it
 
 ```{r IBCF Reccomenderlab}
+knitr::opts_chunk$set(cache = TRUE)
+gc()#Garbage collection
+
   y=0.9
   sparse_m <- create_sparse_m()
   nn=15
@@ -768,7 +916,11 @@ Another algorithm in reccomenderlab is the POPULAR algorithm which is
 based on item popularity
 
 ```{r POPULAR Reccomenderlab}
+
+knitr::opts_chunk$set(cache = TRUE)
   #Let us try the POPULAR method
+gc()#Garbage collection
+
 sparse_m <- create_sparse_m()
 #Reduction parameter
 y=0.9
@@ -814,6 +966,10 @@ factorization.
 
 ```{r Matrix Factorization recosystem}
 
+knitr::opts_chunk$set(cache = TRUE)
+
+gc()#Garbage collection
+
 #we select only the userID, MovieID and rating in the next three statements
 test_GD <- as.matrix (test_set [,1:3])
 train_GD <- as.matrix(test_set [,1:3])
@@ -831,7 +987,8 @@ r = Reco()
 # Matrix Factorization :  tuning training set
 # lrate is the gradient descend step rate
 # dim are the number of latent factors
-# nthread is number of threads to use : REDUCE IF YOUR PROCESSOR DOESN'T SUPPORT 6 THREADS
+# nthread is number of threads to use : 
+#REDUCE IF YOUR PROCESSOR DOESN'T SUPPORT 6 THREADS
 
 opts = r$tune(train_GD_2, opts = list(dim = c(10, 20, 30), lrate = c(0.1, 0.2),
                                      costp_l1 = 0, costq_l1 = 0,
@@ -867,9 +1024,16 @@ linear regression
 
 We will now calculate the RMSE on the holdout validation set using the
 best algorithm to arrive at our final RMSE. The algorithm "Matrix
-Factorization using recosystem" is chosen as the best performing with an RMSE of 0.8582224.
+Factorization using recosystem" is chosen as the best performing with an 
+RMSE of 0.710 on the test_set. This will be used for calculating the validation 
+RMSE. 
 
-```{r}
+```{r final results}
+
+knitr::opts_chunk$set(cache = TRUE)
+
+gc()#Garbage collection
+
 invisible(gc())
 #Selecting only pertinent columns
 valid_GD <-as.matrix(validation [,1:3])
@@ -880,9 +1044,11 @@ pred <- r$predict(valid_GD_2, out_memory())
 
 rmse_MFGD_final <- RMSE(pred,validation$rating)
 
-rmse_results <- rmse_results %>% add_row(method ="Matrix Factorization using recosystem : FINAL Validation RMSE ",
+rmse_results <- rmse_results %>% add_row(
+  method ="Matrix Factorization using recosystem : FINAL Validation RMSE ",
                                          RMSE =rmse_MFGD_final)
 
+options(pillar.sigfig = 10)
 rmse_results
 ```
 
@@ -898,11 +1064,17 @@ algorithm for solving recommendation problems in an efficient manner.
 Although we used cross validation to tune the parameters of the UBCF
 algorithm, we selected only defaults for others. Further reports could
 focus on better tuning collaborative filtering algorithms to minimize
-the RMSE. The time aspect, particularly the effect on time of day could
-be explored further. We could also change the order of our linear
+the RMSE. We could extract the year from the title to 
+see if older or newer movies have any pattern in their ratings. 
+For our regression model, We could select lambda individually for each effect.
+We could also change the order of our linear
 regression effects to see its effect on the RMSE. Other future work could
 also include ensemble methods using multiple algorithms and weighting
 them into a combined result.
+
+The RMSE of Matrix Factorization using recosystem on the validation set is
+0.85796, beating the target of 0.86490. The accompanying script file contains
+also the code to apply the final regression model to the validation set.
 
 ## References
 
